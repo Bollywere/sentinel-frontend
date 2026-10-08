@@ -1,155 +1,174 @@
-const features = [
-  {
-    number: "01",
-    title: "See risk sooner",
-    description:
-      "Explore how on-chain activity can surface unusual patterns for review and investigation.",
-    icon: "◉",
-  },
-  {
-    number: "02",
-    title: "Keep decisions transparent",
-    description:
-      "Design risk scores with clear context, so teams can understand what a signal represents.",
-    icon: "⌁",
-  },
-  {
-    number: "03",
-    title: "Connect off-chain and on-chain",
-    description:
-      "Explore a workflow that connects monitoring agents with Soroban smart contracts.",
-    icon: "↗",
-  },
-];
+"use client";
 
-function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 36 36" fill="none">
-        <path d="M18 2.8 21.8 14l11.4 4-11.4 4L18 33.2 14.2 22 2.8 18l11.4-4L18 2.8Z" />
-        <circle cx="18" cy="18" r="3.2" />
-      </svg>
-    </span>
-  );
+import { FormEvent, useCallback, useEffect, useState } from "react";
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+
+type Signal = { id?: string; label: string; value?: string | number; severity?: string; points?: number; explanation?: string; source?: string; observed_at?: string; window?: string };
+type RiskResult = {
+  address: string;
+  score: number;
+  risk_level: string;
+  threshold: number;
+  threshold_exceeded: boolean;
+  signals: Signal[];
+  metrics: { operations_scanned: number; operations_in_window: number; transfers_in_window: number; transfer_volume_xlm: number; distinct_counterparties: number; account_sequence: number; native_xlm_balance: number; window_days: number };
+  source: { horizon_url: string; network: string };
+  as_of: string;
+};
+type SentinelEvent = { id: string; ledger: number; created_at: string; agent: string; subject: string; score: number; contract_id: string };
+type EventPage = { events: SentinelEvent[]; next_cursor: string | null; source?: { rpc_url: string; network: string } };
+type NetworkStatus = { network: string; rpc_url: string; status: string; latest_ledger: number | null; oldest_ledger: number | null; observed_at: string };
+
+class ApiError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
 }
 
-function ArrowIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-      <path d="M4.2 10h11.6M10 4.2l5.8 5.8-5.8 5.8" />
-    </svg>
-  );
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try { const body = await response.json(); detail = body.detail || body.message || detail; } catch { /* response was not JSON */ }
+    throw new ApiError(detail, response.status);
+  }
+  return response.json() as Promise<T>;
 }
 
-function DashboardPreview() {
-  return (
-    <div className="preview-wrap" aria-label="Illustrative Stellar Sentinel risk monitoring dashboard preview. Sample data only; no live network connection.">
-      <div className="orbit orbit-one" />
-      <div className="orbit orbit-two" />
-      <div className="preview-card">
-        <div className="preview-topbar">
-          <div className="preview-brand"><BrandMark /><span>Stellar Sentinel</span></div>
-          <span className="demo-label"><i /> SAMPLE DATA · NOT CONNECTED</span>
-        </div>
-        <div className="preview-content">
-          <div className="preview-heading">
-            <div><span className="eyebrow">STELLAR / SOROBAN</span><h2>Network overview</h2></div>
-            <span className="range-pill">LAST 24 HOURS <span>⌄</span></span>
-          </div>
-          <div className="metric-grid">
-            <div className="metric-card"><div className="metric-label"><span>MONITORED ACCOUNTS</span><span className="metric-icon">◎</span></div><strong>2,481</strong><small><b>↗ 12.8%</b> <span>vs. previous period</span></small><div className="metric-spark spark-one" aria-hidden="true" /></div>
-            <div className="metric-card"><div className="metric-label"><span>FLAGGED FOR REVIEW</span><span className="metric-icon alert-icon">!</span></div><strong className="attention-number">08</strong><small><b className="attention-change">2 high priority</b> <span>in this period</span></small><div className="metric-spark spark-two" aria-hidden="true" /></div>
-          </div>
-          <div className="chart-card">
-            <div className="chart-title"><span><b>Activity signals</b><small>Risk events across monitored accounts</small></span><span className="chart-legend"><i /> BASELINE <i /> ELEVATED</span></div>
-            <div className="chart">
-              <div className="chart-y-labels"><span>100</span><span>75</span><span>50</span><span>25</span></div>
-              <div className="chart-plot">
-                <div className="chart-gridline line-1" /><div className="chart-gridline line-2" /><div className="chart-gridline line-3" /><div className="chart-gridline line-4" />
-                <svg viewBox="0 0 520 150" preserveAspectRatio="none" role="img" aria-label="Illustrative activity signal chart">
-                  <defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#9ef2c1" stopOpacity=".23" /><stop offset="1" stopColor="#9ef2c1" stopOpacity="0" /></linearGradient></defs>
-                  <path className="chart-area" d="M0 108 C24 104 32 80 56 86 S91 113 117 91 148 73 171 83 198 96 224 70 261 78 281 65 311 51 331 67 362 93 382 72 417 55 438 63 472 39 493 46 514 29 520 32 L520 150 L0 150Z" />
-                  <path className="chart-line" d="M0 108 C24 104 32 80 56 86 S91 113 117 91 148 73 171 83 198 96 224 70 261 78 281 65 311 51 331 67 362 93 382 72 417 55 438 63 472 39 493 46 514 29 520 32" />
-                  <path className="chart-line chart-line-muted" d="M0 122 C24 119 36 114 56 116 S91 109 117 114 149 104 171 109 200 101 224 107 258 100 281 104 311 96 331 103 361 109 382 101 415 99 438 102 471 94 493 98 515 91 520 94" />
-                  <circle cx="493" cy="46" r="4" className="chart-point" />
-                </svg>
-                <div className="chart-x-labels"><span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>24:00</span></div>
-              </div>
-            </div>
-          </div>
-          <div className="signals-heading"><span>Example signals</span><span>SAMPLE <b>✦</b></span></div>
-          <div className="signal-row"><span className="signal-status status-high" /><span className="signal-address">GAB7…KQ2M</span><span className="signal-type">Unusual transfer pattern</span><span className="signal-score">HIGH <b>82</b></span><span className="signal-time">10:24</span></div>
-          <div className="signal-row"><span className="signal-status status-medium" /><span className="signal-address">GCD4…P9XR</span><span className="signal-type">Rapid account activity</span><span className="signal-score medium-score">REVIEW <b>64</b></span><span className="signal-time">09:58</span></div>
-          <div className="preview-foot"><span><i className="tiny-star">✦</i> Designed for explainable risk review</span><span>ILLUSTRATIVE DATA · NOT LIVE</span></div>
-        </div>
-      </div>
-      <div className="floating-chip"><span className="chip-icon">✳</span><span><b>Sample signal</b><small>Review activity with context</small></span><span className="chip-dot" /></div>
-    </div>
-  );
+function Mark() {
+  return <span className="mark" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><path d="M18 2.8 21.8 14l11.4 4-11.4 4L18 33.2 14.2 22 2.8 18l11.4-4L18 2.8Z"/><circle cx="18" cy="18" r="3.2"/></svg></span>;
+}
+
+function shortAddress(address: string) { return address.length > 18 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address; }
+function formatDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+function formatXlm(value: number) { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value); }
+function networkName(passphrase?: string) {
+  if (!passphrase) return "Stellar network";
+  if (passphrase.includes("Test SDF Network")) return "Testnet";
+  if (passphrase.includes("Public Global Stellar Network")) return "Public network";
+  return passphrase;
 }
 
 export default function HomePage() {
+  const [address, setAddress] = useState("");
+  const [risk, setRisk] = useState<RiskResult | null>(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskError, setRiskError] = useState("");
+  const [events, setEvents] = useState<SentinelEvent[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [network, setNetwork] = useState<NetworkStatus | null>(null);
+  const [networkLoading, setNetworkLoading] = useState(true);
+  const [networkError, setNetworkError] = useState("");
+
+  const loadNetworkStatus = useCallback(async () => {
+    setNetworkLoading(true);
+    setNetworkError("");
+    try {
+      const status = await api<NetworkStatus>("/network/status");
+      setNetwork(status);
+    } catch (error) {
+      setNetworkError(error instanceof Error ? error.message : "Could not retrieve Stellar RPC status.");
+    } finally { setNetworkLoading(false); }
+  }, []);
+
+  const loadEvents = useCallback(async (next?: string, append = false) => {
+    setEventsLoading(true);
+    setEventsError("");
+    try {
+      const query = new URLSearchParams({ limit: "20" });
+      if (next) query.set("cursor", next);
+      const page = await api<EventPage>(`/events?${query.toString()}`);
+      setEvents((current) => append ? [...current, ...page.events] : page.events);
+      setCursor(page.next_cursor);
+      setApiOnline(true);
+    } catch (error) {
+      setEventsError(error instanceof Error ? error.message : "Could not load event feed.");
+      setApiOnline(error instanceof ApiError ? true : false);
+    } finally { setEventsLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadEvents(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadEvents]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadNetworkStatus(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadNetworkStatus]);
+
+  async function submitRisk(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const account = address.trim();
+    if (!account) return;
+    setRiskLoading(true); setRiskError(""); setRisk(null);
+    try {
+      const result = await api<RiskResult>("/risk/score", { method: "POST", body: JSON.stringify({ address: account }) });
+      setRisk(result); setApiOnline(true);
+    } catch (error) {
+      setRiskError(error instanceof Error ? error.message : "Could not assess this account.");
+      setApiOnline(error instanceof ApiError ? true : false);
+    } finally { setRiskLoading(false); }
+  }
+
+  const scoreTone = risk?.threshold_exceeded ? "high" : risk?.risk_level === "elevated" ? "medium" : "low";
+  const rpcHealthy = network?.status.toLowerCase() === "healthy";
+  const rpcLabel = network?.status || "unknown";
+  const currentNetwork = networkName(network?.network);
+
   return (
-    <main>
-      <header className="site-header">
-        <a className="brand" href="#top" aria-label="Stellar Sentinel home"><BrandMark /><span>Stellar <span className="brand-light">Sentinel</span></span></a>
-        <nav className="desktop-nav" aria-label="Main navigation">
-          <a href="#platform">Platform</a><a href="#how-it-works">How it works</a><a href="#built-for">Built for Stellar</a>
+    <main className="shell">
+      <aside className="sidebar">
+        <a className="brand" href="#overview"><Mark/><span>Stellar <b>Sentinel</b></span></a>
+        <div className="workspace-label">WORKSPACE</div>
+        <nav className="side-nav" aria-label="Dashboard">
+          <a className="active" href="#overview"><span className="nav-icon">◫</span> Overview</a>
+          <a href="#investigate"><span className="nav-icon">⌕</span> Account screening</a>
+          <a href="#events"><span className="nav-icon">◷</span> On-chain events</a>
         </nav>
-        <a className="header-cta" href="#how-it-works">Explore the vision <ArrowIcon /></a>
-      </header>
+        <div className="sidebar-bottom"><div className={`network-box ${networkError || (network && !rpcHealthy) ? "network-warning" : ""}`}><span className={`network-dot ${networkLoading ? "pending" : networkError || !rpcHealthy ? "offline" : ""}`}/><div><b>{networkLoading ? "Checking RPC…" : networkError ? "RPC status unavailable" : `${currentNetwork} · RPC ${rpcLabel}`}</b><small>{networkError ? networkError : network?.latest_ledger != null ? `Latest ledger ${network.latest_ledger.toLocaleString()}` : "Waiting for latest ledger"}</small>{networkError && <button className="network-retry" onClick={() => void loadNetworkStatus()}>Retry status check</button>}</div></div><div className="sidebar-note">Risk intelligence for open finance</div></div>
+      </aside>
 
-      <section className="hero" id="top">
-        <div className="hero-glow" />
-        <div className="hero-copy">
-          <div className="announcement"><span>✦</span> RISK CONTEXT FOR STELLAR &amp; SOROBAN</div>
-          <h1>Make on-chain<br />risk <span>easier to see.</span></h1>
-          <p className="hero-description">Stellar Sentinel is an early-stage project exploring explainable activity signals and Soroban workflows to help teams understand risk across Stellar.</p>
-          <div className="hero-actions"><a className="button-primary" href="#platform">Discover the platform <ArrowIcon /></a><a className="text-link" href="#how-it-works">See how it works <span>↓</span></a></div>
-          <div className="hero-proof"><div className="proof-stars" aria-hidden="true"><span>✳</span><span>✦</span><span>✧</span></div><p><b>Built for the Stellar ecosystem</b><br />A work in progress, designed around clarity.</p></div>
-        </div>
-        <DashboardPreview />
-        <div className="hero-bottom-note"><span>01 / A NEW PERSPECTIVE ON NETWORK RISK</span><span>SCROLL TO EXPLORE ↓</span></div>
-      </section>
+      <section className="main-area" id="overview">
+        <header className="topbar"><div className="mobile-brand"><Mark/> Stellar Sentinel</div><div className="breadcrumb">Monitoring <span>/</span> Overview</div><div className="header-statuses"><button className={`network-pill ${networkError || (network && !rpcHealthy) ? "unhealthy" : ""}`} onClick={() => void loadNetworkStatus()} title={networkError || `Last RPC health check ${network?.observed_at ? formatDate(network.observed_at) : "pending"}`}><i className={networkLoading ? "pending" : networkError || !rpcHealthy ? "offline" : ""}/>{networkLoading ? "Checking Stellar RPC…" : networkError ? "RPC status unavailable · Retry" : `${currentNetwork} · RPC ${rpcLabel}`}{network?.latest_ledger != null && <span className="header-ledger">Ledger {network.latest_ledger.toLocaleString()}</span>}</button><div className="top-status"><span className={`status-dot ${apiOnline === false ? "offline" : ""}`}/>{apiOnline === null ? "Connecting to API" : apiOnline ? "API connected" : "API unavailable"}</div></div></header>
+        <div className="content">
+          <div className="page-heading"><div><div className="eyebrow">{currentNetwork.toUpperCase()} · ACCOUNT INTELLIGENCE</div><h1>Monitoring overview</h1><p>Screen Stellar accounts, review activity signals, and inspect contract flag events.</p></div><span className="network-pill static-pill"><i/> Horizon · {currentNetwork}</span></div>
 
-      <section className="ecosystem-strip" id="built-for">
-        <span className="strip-label">PURPOSE-BUILT FOR</span>
-        <div className="ecosystem-name"><span className="stellar-symbol">✳</span><span>STELLAR <small>NETWORK</small></span></div>
-        <div className="strip-divider" />
-        <p>Designed for the next generation of<br className="desktop-break" /> <b>transparent, open finance.</b></p>
-        <span className="strip-decoration" aria-hidden="true">✦ &nbsp; ◌ &nbsp; ✧</span>
-      </section>
+          <section className="screening-card" id="investigate" aria-labelledby="screening-title">
+            <div className="screening-copy"><div className="section-icon">⌕</div><div><h2 id="screening-title">Screen an account</h2><p>Assess recent Stellar account activity and understand the signals behind its risk score.</p></div></div>
+            <form className="lookup-form" onSubmit={submitRisk}><label className="sr-only" htmlFor="stellar-address">Stellar account address</label><input id="stellar-address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Paste a Stellar account address (G…)" autoComplete="off" spellCheck={false}/><button type="submit" disabled={riskLoading || !address.trim()}>{riskLoading ? <><span className="spinner"/> Analyzing</> : <>Analyze account <span>→</span></>}</button></form>
+            <div className="form-hint"><span>◎</span> Account activity is retrieved from Stellar Horizon. Scores are signals for review, not financial or compliance advice.</div>
+            {riskError && <div className="notice error" role="alert"><b>Could not analyze account</b><span>{riskError}</span><small>Check the address and confirm the backend is available at {API_BASE}.</small></div>}
+          </section>
 
-      <section className="platform-section section-pad" id="platform">
-        <div className="section-kicker"><span>01</span> THE PLATFORM</div>
-        <div className="section-intro"><h2>Clarity for a<br /><span>connected ecosystem.</span></h2><p>Digital asset networks move quickly. Stellar Sentinel is being developed to help teams make sense of activity and explore how risk insights could connect to Soroban workflows.</p></div>
-        <div className="feature-grid">
-          {features.map((feature) => <article className="feature-card" key={feature.number}><div className="feature-top"><span>{feature.number}</span><span className="feature-icon">{feature.icon}</span></div><h3>{feature.title}</h3><p>{feature.description}</p><span className="feature-rule" /></article>)}
-        </div>
-      </section>
+          {risk && <section className="result-section" aria-live="polite">
+            <div className="result-title"><div><div className="eyebrow">ACCOUNT ASSESSMENT</div><h2>{shortAddress(risk.address)}</h2></div><span className={`risk-badge ${scoreTone}`}>{risk.threshold_exceeded ? "Review threshold exceeded" : `${risk.risk_level} risk signal`}</span></div>
+            <div className="result-grid">
+              <article className="score-card panel"><div className="card-label">RISK SCORE <span>OUT OF 100</span></div><div className={`score-value ${scoreTone}`}>{risk.score}<small>/100</small></div><div className="score-meter"><i className={scoreTone} style={{ width: `${Math.max(0, Math.min(100, risk.score))}%` }}/></div><p>{risk.threshold_exceeded ? `Score meets or exceeds the review threshold of ${risk.threshold}.` : `Review threshold: ${risk.threshold}.`}</p><small className="muted">Evaluated {formatDate(risk.as_of)}</small></article>
+              <article className="activity-card panel"><div className="card-label">OBSERVED ACCOUNT ACTIVITY <span>{risk.source.network}</span></div><div className="activity-stats"><div><strong>{risk.metrics.operations_scanned.toLocaleString()}</strong><small>Operations scanned</small></div><div><strong>{formatXlm(risk.metrics.transfer_volume_xlm)} <em>XLM</em></strong><small>Transfer volume</small></div><div><strong>{risk.metrics.distinct_counterparties.toLocaleString()}</strong><small>Counterparties</small></div><div><strong>{formatXlm(risk.metrics.native_xlm_balance)} <em>XLM</em></strong><small>Current balance</small></div></div><div className="data-source"><span className="source-check">✓</span> Activity sourced from <a href={risk.source.horizon_url} target="_blank" rel="noreferrer">Stellar Horizon ↗</a> · last {risk.metrics.window_days} days</div></article>
+            </div>
+            <div className="signals-card panel"><div className="panel-heading"><div><h3>Signals behind this assessment</h3><p>Review the activity context used to produce this score.</p></div><span className="count-pill">{risk.signals.length} signals</span></div>
+              {risk.signals.length ? <div className="table-scroll"><table><thead><tr><th>Signal</th><th>Observation</th><th>Severity</th><th>Points</th><th>Why it matters</th><th>Window</th></tr></thead><tbody>{risk.signals.map((signal, index) => <tr key={signal.id ?? `${signal.label}-${index}`}><td className="signal-name"><span className={`severity-dot ${(signal.severity || "").toLowerCase()}`}/>{signal.label}</td><td>{signal.value ?? "—"}</td><td><span className={`severity-tag ${(signal.severity || "info").toLowerCase()}`}>{signal.severity || "Info"}</span></td><td>{signal.points ?? 0}</td><td className="signal-explanation">{signal.explanation || signal.source || "Observed account activity"}</td><td>{signal.window || "Recent activity"}</td></tr>)}</tbody></table></div> : <div className="empty-inline">No notable signals were returned for this assessment.</div>}
+            </div>
+          </section>}
 
-      <section className="workflow-section" id="how-it-works">
-        <div className="workflow-inner section-pad">
-          <div className="section-kicker light-kicker"><span>02</span> HOW IT COMES TOGETHER</div>
-          <div className="workflow-heading"><h2>From activity<br />to <span>understanding.</span></h2><p>The proposed workflow connects relevant network activity with contextual signals and transparent Soroban infrastructure.</p></div>
-          <div className="workflow-steps">
-            <article><span className="step-number">01</span><div className="step-icon">⌘</div><h3>Observe</h3><p>Bring relevant network activity into view.</p></article><div className="step-connector" />
-            <article><span className="step-number">02</span><div className="step-icon">◉</div><h3>Understand</h3><p>Review contextual signals and see why they stand out.</p></article><div className="step-connector" />
-            <article><span className="step-number">03</span><div className="step-icon">✧</div><h3>Respond</h3><p>Explore how insights could connect to Soroban workflows.</p></article>
-          </div>
-          <div className="workflow-note"><span>✦</span> Built around transparency at every step.</div>
+          <section className="events-section" id="events">
+            <div className="panel-heading events-heading"><div><div className="eyebrow">SOROBAN CONTRACT ACTIVITY</div><h2>Flag events</h2><p>Threshold alerts recorded by the Stellar Sentinel contract.</p></div><button className="icon-button" onClick={() => void loadEvents()} disabled={eventsLoading} aria-label="Refresh events">↻</button></div>
+            <div className="events-panel panel">
+              {eventsLoading && events.length === 0 ? <div className="state-message"><span className="spinner dark"/><b>Loading contract events</b><span>Checking the connected Soroban event source…</span></div> : eventsError ? <div className="state-message"><span className="state-icon warning">!</span><b>Event feed unavailable</b><span>{eventsError}</span><small>Configure the contract and Soroban RPC in the backend to enable this feed.</small><button className="secondary-button" onClick={() => void loadEvents()}>Try again</button></div> : events.length === 0 ? <div className="state-message"><span className="state-icon">◷</span><b>No flag events yet</b><span>The connected contract has not returned any events.</span></div> : <>
+                <div className="table-scroll"><table><thead><tr><th>ACCOUNT</th><th>SCORE</th><th>AGENT</th><th>LEDGER</th><th>RECORDED</th></tr></thead><tbody>{events.map((item) => <tr key={item.id}><td className="signal-name"><span className="severity-dot high"/>{shortAddress(item.subject)}</td><td><span className="event-score">{item.score}</span></td><td className="mono">{shortAddress(item.agent)}</td><td className="mono">{item.ledger.toLocaleString()}</td><td>{formatDate(item.created_at)}</td></tr>)}</tbody></table></div>
+                {cursor && <div className="load-more"><button className="secondary-button" disabled={eventsLoading} onClick={() => void loadEvents(cursor, true)}>{eventsLoading ? "Loading…" : "Load older events"}</button></div>}
+              </>}
+            </div>
+          </section>
+          <footer className="page-footer"><span>Stellar Sentinel</span><span>Risk signals support informed review; they are not definitive findings.</span><a href={`${API_BASE}/docs`} target="_blank" rel="noreferrer">API documentation ↗</a></footer>
         </div>
       </section>
-
-      <section className="closing-section section-pad">
-        <div className="closing-orb" aria-hidden="true"><span>✦</span></div>
-        <div className="section-kicker"><span>03</span> A MORE CONFIDENT NETWORK</div>
-        <h2>See the signal.<br /><span>Strengthen the network.</span></h2>
-        <p>Help shape a more understandable approach to risk monitoring for Stellar and Soroban.</p>
-        <a className="button-primary" href="#platform">Explore the platform <ArrowIcon /></a>
-      </section>
-
-      <footer className="site-footer"><a className="brand footer-brand" href="#top"><BrandMark /><span>Stellar <span className="brand-light">Sentinel</span></span></a><span>Risk monitoring for the Stellar ecosystem.</span><span>BUILT FOR A MORE TRANSPARENT FUTURE <i>✦</i></span></footer>
     </main>
   );
 }
