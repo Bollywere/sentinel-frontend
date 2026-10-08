@@ -1,5 +1,7 @@
 # Stellar Sentinel Frontend
 
+[Open the live dashboard](https://sentinel-frontend-gules.vercel.app)
+
 Stellar Sentinel is a dashboard for screening Stellar account activity and reviewing Soroban contract flag events. Scores are transparent off-chain signals; they do not submit a transaction or create a contract flag.
 
 ## Architecture
@@ -14,7 +16,7 @@ flowchart LR
   Contract[Soroban Sentinel contract] -->|flagged events| RPC
 ```
 
-The browser uses the backend as its only application API. It renders account metrics and signal explanations, the current network/RPC status, and a paginated contract event feed. The event feed requires a deployed contract ID configured in the backend.
+The browser uses the backend as its only application API. It renders account metrics and signal explanations, the current network/RPC status, and a paginated contract event feed. If loading an older event page fails, already-loaded events remain visible and the failed cursor can be retried. The event feed requires a deployed contract ID configured in the backend.
 
 ## Stellar Testnet deployment
 
