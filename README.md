@@ -1,5 +1,7 @@
 # Stellar Sentinel Frontend
 
+[Open the live dashboard](https://sentinel-frontend-gules.vercel.app)
+
 Stellar Sentinel is a dashboard for screening Stellar account activity and reviewing Soroban contract flag events. Scores are transparent off-chain signals; they do not submit a transaction or create a contract flag.
 
 ## Architecture
