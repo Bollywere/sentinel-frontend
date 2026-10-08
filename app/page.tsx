@@ -3,6 +3,11 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+const dashboardSections = [
+  { id: "overview", label: "Overview", icon: "◫" },
+  { id: "investigate", label: "Account screening", icon: "⌕" },
+  { id: "events", label: "On-chain events", icon: "◷" },
+];
 
 type Signal = { id?: string; label: string; value?: string | number; severity?: string; points?: number; explanation?: string; source?: string; observed_at?: string; window?: string };
 type RiskResult = {
@@ -64,6 +69,24 @@ export default function HomePage() {
   const [network, setNetwork] = useState<NetworkStatus | null>(null);
   const [networkLoading, setNetworkLoading] = useState(true);
   const [networkError, setNetworkError] = useState("");
+  const [activeSection, setActiveSection] = useState("overview");
+
+  useEffect(() => {
+    const sections = dashboardSections
+      .map(({ id }) => document.getElementById(id))
+      .filter((section): section is HTMLElement => section !== null);
+    if (!("IntersectionObserver" in window)) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: "-90px 0px -65% 0px", threshold: [0, 0.15, 0.4] });
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
 
   const loadNetworkStatus = useCallback(async () => {
     setNetworkLoading(true);
@@ -121,23 +144,31 @@ export default function HomePage() {
   const rpcLabel = network?.status || "unknown";
   const currentNetwork = networkName(network?.network);
 
+  function sectionNavigation(className: string, label: string) {
+    return <nav className={className} aria-label={label}>
+      {dashboardSections.map((section) => <a
+        key={section.id}
+        className={activeSection === section.id ? "active" : ""}
+        href={`#${section.id}`}
+        aria-current={activeSection === section.id ? "location" : undefined}
+        onClick={() => setActiveSection(section.id)}
+      ><span className="nav-icon" aria-hidden="true">{section.icon}</span><span>{section.label}</span></a>)}
+    </nav>;
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
         <a className="brand" href="#overview"><Mark/><span>Stellar <b>Sentinel</b></span></a>
         <div className="workspace-label">WORKSPACE</div>
-        <nav className="side-nav" aria-label="Dashboard">
-          <a className="active" href="#overview"><span className="nav-icon">◫</span> Overview</a>
-          <a href="#investigate"><span className="nav-icon">⌕</span> Account screening</a>
-          <a href="#events"><span className="nav-icon">◷</span> On-chain events</a>
-        </nav>
+        {sectionNavigation("side-nav", "Dashboard")}
         <div className="sidebar-bottom"><div className={`network-box ${networkError || (network && !rpcHealthy) ? "network-warning" : ""}`}><span className={`network-dot ${networkLoading ? "pending" : networkError || !rpcHealthy ? "offline" : ""}`}/><div><b>{networkLoading ? "Checking RPC…" : networkError ? "RPC status unavailable" : `${currentNetwork} · RPC ${rpcLabel}`}</b><small>{networkError ? networkError : network?.latest_ledger != null ? `Latest ledger ${network.latest_ledger.toLocaleString()}` : "Waiting for latest ledger"}</small>{networkError && <button className="network-retry" onClick={() => void loadNetworkStatus()}>Retry status check</button>}</div></div><div className="sidebar-note">Risk intelligence for open finance</div></div>
       </aside>
 
-      <section className="main-area" id="overview">
+      <section className="main-area">
         <header className="topbar"><div className="mobile-brand"><Mark/> Stellar Sentinel</div><div className="breadcrumb">Monitoring <span>/</span> Overview</div><div className="header-statuses"><button className={`network-pill ${networkError || (network && !rpcHealthy) ? "unhealthy" : ""}`} onClick={() => void loadNetworkStatus()} title={networkError || `Last RPC health check ${network?.observed_at ? formatDate(network.observed_at) : "pending"}`}><i className={networkLoading ? "pending" : networkError || !rpcHealthy ? "offline" : ""}/>{networkLoading ? "Checking Stellar RPC…" : networkError ? "RPC status unavailable · Retry" : `${currentNetwork} · RPC ${rpcLabel}`}{network?.latest_ledger != null && <span className="header-ledger">Ledger {network.latest_ledger.toLocaleString()}</span>}</button><div className="top-status"><span className={`status-dot ${apiOnline === false ? "offline" : ""}`}/>{apiOnline === null ? "Connecting to API" : apiOnline ? "API connected" : "API unavailable"}</div></div></header>
         <div className="content">
-          <div className="page-heading"><div><div className="eyebrow">{currentNetwork.toUpperCase()} · ACCOUNT INTELLIGENCE</div><h1>Monitoring overview</h1><p>Screen Stellar accounts, review activity signals, and inspect contract flag events.</p></div><span className="network-pill static-pill"><i/> Horizon · {currentNetwork}</span></div>
+          <div className="page-heading" id="overview"><div><div className="eyebrow">{currentNetwork.toUpperCase()} · ACCOUNT INTELLIGENCE</div><h1>Monitoring overview</h1><p>Screen Stellar accounts, review activity signals, and inspect contract flag events.</p></div><span className="network-pill static-pill"><i/> Horizon · {currentNetwork}</span></div>
 
           <section className="screening-card" id="investigate" aria-labelledby="screening-title">
             <div className="screening-copy"><div className="section-icon">⌕</div><div><h2 id="screening-title">Screen an account</h2><p>Assess recent Stellar account activity and understand the signals behind its risk score.</p></div></div>
@@ -169,6 +200,7 @@ export default function HomePage() {
           <footer className="page-footer"><span>Stellar Sentinel</span><span>Risk signals support informed review; they are not definitive findings.</span><a href={`${API_BASE}/docs`} target="_blank" rel="noreferrer">API documentation ↗</a></footer>
         </div>
       </section>
+      {sectionNavigation("mobile-nav", "Mobile dashboard")}
     </main>
   );
 }
