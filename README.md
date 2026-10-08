@@ -16,6 +16,10 @@ flowchart LR
 
 The browser uses the backend as its only application API. It renders account metrics and signal explanations, the current network/RPC status, and a paginated contract event feed. The event feed requires a deployed contract ID configured in the backend.
 
+## Stellar Testnet deployment
+
+The backend is configured for the Stellar Sentinel contract at [`CCZAAZ3FJ7LKZA7E7A6EKQTU2HCNVI3YUVIHKWHSULGZSWAJFS2D2XVX`](https://stellar.expert/explorer/testnet/contract/CCZAAZ3FJ7LKZA7E7A6EKQTU2HCNVI3YUVIHKWHSULGZSWAJFS2D2XVX). The dashboard reads its Soroban events through `GET /events`. The contract is initialized at threshold 70; its feed is empty until an authorized agent records a flag. Deployment and transaction details are in the [contract README](https://github.com/Stellar-Sentinel/sentinel-contracts#testnet-deployment).
+
 ## Project layout
 
 - `app/page.tsx` — dashboard, account screening form, event feed, and section navigation.
