@@ -21,7 +21,7 @@ type RiskResult = {
   source: { horizon_url: string; network: string };
   as_of: string;
 };
-type SentinelEvent = { id: string; ledger: number; created_at: string; agent: string; subject: string; score: number; contract_id: string };
+type SentinelEvent = { id: string; ledger: number; created_at: string; agent: string; subject: string; score: number; contract_id: string; transaction_hash?: string; tx_hash?: string };
 type EventPage = { events: SentinelEvent[]; next_cursor: string | null; source?: { rpc_url: string; network: string } };
 type EventRetry = { next?: string; append: boolean };
 type NetworkStatus = { network: string; rpc_url: string; status: string; latest_ledger: number | null; oldest_ledger: number | null; observed_at: string };
@@ -55,6 +55,21 @@ function networkName(passphrase?: string) {
   if (passphrase.includes("Test SDF Network")) return "Testnet";
   if (passphrase.includes("Public Global Stellar Network")) return "Public network";
   return passphrase;
+}
+
+function explorerUrl(network: string | undefined, type: "account" | "contract" | "tx", value: string) {
+  const normalized = network?.toLowerCase() || "";
+  const networkPath = normalized.includes("testnet") || normalized.includes("test sdf network")
+    ? "testnet"
+    : normalized.includes("public") ? "public" : null;
+  return networkPath && value ? `https://stellar.expert/explorer/${networkPath}/${type}/${encodeURIComponent(value)}` : null;
+}
+
+function ExplorerLink({ network, type, value, label, accessibleLabel }: { network?: string; type: "account" | "contract" | "tx"; value: string; label: string; accessibleLabel: string }) {
+  const href = explorerUrl(network, type, value);
+  return href
+    ? <a className="mono explorer-link" href={href} target="_blank" rel="noopener noreferrer" aria-label={accessibleLabel}>{label} ↗</a>
+    : <span className="mono">{label}</span>;
 }
 
 export default function HomePage() {
@@ -197,7 +212,7 @@ export default function HomePage() {
           </section>
 
           {risk && <section className="result-section" aria-live="polite">
-            <div className="result-title"><div><div className="eyebrow">ACCOUNT ASSESSMENT</div><h2>{shortAddress(risk.address)}</h2></div><span className={`risk-badge ${scoreTone}`}>{risk.threshold_exceeded ? "Review threshold exceeded" : `${risk.risk_level} risk signal`}</span></div>
+              <div className="result-title"><div><div className="eyebrow">ACCOUNT ASSESSMENT</div><h2><ExplorerLink network={risk.source.network} type="account" value={risk.address} label={shortAddress(risk.address)} accessibleLabel={`View account ${risk.address} on Stellar Expert`}/></h2></div><span className={`risk-badge ${scoreTone}`}>{risk.threshold_exceeded ? "Review threshold exceeded" : `${risk.risk_level} risk signal`}</span></div>
             <div className="result-grid">
               <article className="score-card panel"><div className="card-label">RISK SCORE <span>OUT OF 100</span></div><div className={`score-value ${scoreTone}`}>{risk.score}<small>/100</small></div><div className="score-meter"><i className={scoreTone} style={{ width: `${Math.max(0, Math.min(100, risk.score))}%` }}/></div><p>{risk.threshold_exceeded ? `Score meets or exceeds the review threshold of ${risk.threshold}.` : `Review threshold: ${risk.threshold}.`}</p><small className="muted">Evaluated {formatDate(risk.as_of)}</small></article>
               <article className="activity-card panel"><div className="card-label">OBSERVED ACCOUNT ACTIVITY <span>{risk.source.network}</span></div><div className="activity-stats"><div><strong>{risk.metrics.operations_scanned.toLocaleString()}</strong><small>Operations scanned</small></div><div><strong>{formatXlm(risk.metrics.transfer_volume_xlm)} <em>XLM</em></strong><small>Transfer volume</small></div><div><strong>{risk.metrics.distinct_counterparties.toLocaleString()}</strong><small>Counterparties</small></div><div><strong>{formatXlm(risk.metrics.native_xlm_balance)} <em>XLM</em></strong><small>Current balance</small></div></div><div className="data-source"><span className="source-check">✓</span> Activity sourced from <a href={risk.source.horizon_url} target="_blank" rel="noreferrer">Stellar Horizon ↗</a> · last {risk.metrics.window_days} days</div></article>
@@ -211,7 +226,7 @@ export default function HomePage() {
             <div className="panel-heading events-heading"><div><div className="eyebrow">SOROBAN CONTRACT ACTIVITY</div><h2>Flag events</h2><p>Threshold alerts recorded by the Stellar Sentinel contract.</p></div><button className="icon-button" onClick={() => void loadEvents()} disabled={eventsLoading} aria-label="Refresh events">↻</button></div>
             <div className="events-panel panel">
               {eventsLoading && events.length === 0 ? <div className="state-message"><span className="spinner dark"/><b>Loading contract events</b><span>Checking the connected Soroban event source…</span></div> : eventsError && events.length === 0 ? <div className="state-message"><span className="state-icon warning">!</span><b>Event feed unavailable</b><span>{eventsError}</span><small>Configure the contract and Soroban RPC in the backend to enable this feed.</small><button className="secondary-button" onClick={() => void loadEvents(eventsRetry?.next, eventsRetry?.append ?? false)}>Try again</button></div> : events.length === 0 ? <div className="state-message"><span className="state-icon">◷</span><b>No flag events yet</b><span>The connected contract has not returned any events.</span></div> : <>
-                <div className="table-scroll"><table><thead><tr><th>ACCOUNT</th><th>SCORE</th><th>AGENT</th><th>LEDGER</th><th>RECORDED</th></tr></thead><tbody>{events.map((item) => <tr key={item.id}><td className="signal-name"><span className="severity-dot high"/>{shortAddress(item.subject)}</td><td><span className="event-score">{item.score}</span></td><td className="mono">{shortAddress(item.agent)}</td><td className="mono">{item.ledger.toLocaleString()}</td><td>{formatDate(item.created_at)}</td></tr>)}</tbody></table></div>
+                <div className="table-scroll"><table><thead><tr><th>ACCOUNT</th><th>SCORE</th><th>AGENT</th><th>CONTRACT</th><th>LEDGER</th><th>RECORDED</th>{events.some((item) => item.transaction_hash || item.tx_hash) && <th>TRANSACTION</th>}</tr></thead><tbody>{events.map((item) => { const transactionHash = item.transaction_hash || item.tx_hash; return <tr key={item.id}><td className="signal-name"><span className="severity-dot high"/><ExplorerLink network={network?.network} type="account" value={item.subject} label={shortAddress(item.subject)} accessibleLabel={`View subject account ${item.subject} on Stellar Expert`}/></td><td><span className="event-score">{item.score}</span></td><td><ExplorerLink network={network?.network} type="account" value={item.agent} label={shortAddress(item.agent)} accessibleLabel={`View agent account ${item.agent} on Stellar Expert`}/></td><td><ExplorerLink network={network?.network} type="contract" value={item.contract_id} label={shortAddress(item.contract_id)} accessibleLabel={`View contract ${item.contract_id} on Stellar Expert`}/></td><td className="mono">{item.ledger.toLocaleString()}</td><td>{formatDate(item.created_at)}</td>{events.some((event) => event.transaction_hash || event.tx_hash) && <td>{transactionHash ? <ExplorerLink network={network?.network} type="tx" value={transactionHash} label={shortAddress(transactionHash)} accessibleLabel={`View transaction ${transactionHash} on Stellar Expert`}/> : <span className="mono">—</span>}</td>}</tr>; })}</tbody></table></div>
                 {eventsError ? <div className="load-more load-more-error" role="alert"><span>{eventsError}</span><button className="secondary-button" disabled={eventsLoading} onClick={() => void loadEvents(eventsRetry?.next, eventsRetry?.append ?? false)}>{eventsLoading ? "Retrying…" : eventsRetry?.append ? "Retry loading older events" : "Retry refresh"}</button></div> : cursor && <div className="load-more"><button className="secondary-button" disabled={eventsLoading} onClick={() => void loadEvents(cursor, true)}>{eventsLoading ? "Loading…" : "Load older events"}</button></div>}
               </>}
             </div>
