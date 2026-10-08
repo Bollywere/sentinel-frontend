@@ -1,4 +1,4 @@
-# Contributing to sorosentinel-frontend
+# Contributing to sentinel-frontend
 
 ## Setup
 ```
@@ -14,5 +14,5 @@ npm run dev
 - Update README.md if you changed a page's behavior.
 
 ## Related repos
-- sorosentinel-backend — API this dashboard fetches from
-- sorosentinel-contract — the on-chain source of truth
+- sentinel-backend — API this dashboard fetches from
+- sentinel-contract — the on-chain source of truth

@@ -1,11 +1,13 @@
-# sorosentinel-frontend
+# sentinel-frontend
 
-Next.js dashboard for SoroSentinel — shows flagged addresses and risk
-scores pulled from sorosentinel-backend.
+Next.js landing page for Stellar Sentinel, a risk monitoring project for
+the Stellar ecosystem and Soroban smart contracts. The monitoring preview
+uses illustrative sample content; live dashboard data is not connected yet.
 
 ## Status
-Early scaffold. Dashboard renders mock data only — not yet wired to the
-backend, no wallet connect, no loading/error states. See open issues.
+The responsive product landing page is in `app/page.tsx`, with site styles
+in `app/globals.css`. A live risk dashboard and backend integration remain
+future work.
 
 ## Run
 ```
